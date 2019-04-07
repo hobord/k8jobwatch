@@ -13,25 +13,18 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func getJob(jobName *string, namespaceName *string, clientset *kubernetes.Clientset, waitToJob *bool) (job batch.Job) {
-	log.Print("Looking the job: " + *jobName + " in " + *namespaceName + " NS")
-	for {
-		jobs, err := clientset.BatchV1().Jobs(*namespaceName).List(metav1.ListOptions{})
-		if err != nil {
-			panic(err.Error())
-		}
-		for _, foundJob := range jobs.Items {
-			if *jobName == foundJob.ObjectMeta.GetName() {
-				job = foundJob
-				*waitToJob = false
-			}
-		}
-		if *waitToJob == false {
-			return
-		}
-		log.Print(".")
-		time.Sleep(10 * time.Second)
+func getJob(jobName *string, namespaceName *string, clientset *kubernetes.Clientset) (job batch.Job) {
+	jobs, err := clientset.BatchV1().Jobs(*namespaceName).List(metav1.ListOptions{})
+	if err != nil {
+		panic(err.Error())
 	}
+	for _, foundJob := range jobs.Items {
+		if *jobName == foundJob.ObjectMeta.GetName() {
+			job = foundJob
+		}
+	}
+
+	return job
 }
 
 func main() {
@@ -46,7 +39,8 @@ func main() {
 
 	clientset := kubeclient.GetClientset()
 
-	myJob := getJob(jobName, namespaceName, clientset, waitToJob)
+	log.Print("Looking the job: " + *jobName + " in " + *namespaceName + " NS")
+	myJob := getJob(jobName, namespaceName, clientset)
 
 	// fmt.Println(myJob.UID)
 	// fmt.Println(myJob.Status.Active)
@@ -65,12 +59,16 @@ func main() {
 		if myJob.Status.Succeeded == 1 {
 			break
 		}
+		if myJob.Status.Failed == 0 && myJob.Status.Succeeded == 0 && myJob.Status.Active == 0 && *waitToJob == false {
+			log.Println("Job not found")
+			break
+		}
 		log.Printf("Active: %d\n", myJob.Status.Active)
 		log.Printf("Succeeded: %d\n", myJob.Status.Succeeded)
 		log.Printf("Failed: %d\n", myJob.Status.Failed)
 		log.Print(".")
 		time.Sleep(10 * time.Second)
-		myJob = getJob(jobName, namespaceName, clientset, waitToJob)
+		myJob = getJob(jobName, namespaceName, clientset)
 
 	}
 
