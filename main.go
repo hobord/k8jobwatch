@@ -26,7 +26,7 @@ func getJob(jobName *string, namespaceName *string, clientset *kubernetes.Client
 				*waitToJob = false
 			}
 		}
-		if !*waitToJob {
+		if *waitToJob == false {
 			return
 		}
 		log.Print(".")
@@ -48,21 +48,33 @@ func main() {
 
 	myJob := getJob(jobName, namespaceName, clientset, waitToJob)
 
-	if myJob.Status.Succeeded != 0 {
+	// fmt.Println(myJob.UID)
+	// fmt.Println(myJob.Status.Active)
+	// fmt.Println(myJob.Status.Succeeded)
+	// fmt.Println(myJob.Status.Failed)
+	// fmt.Println(myJob.Status.String())
+
+	if myJob.UID != "" {
 		log.Print("Found: " + myJob.UID)
-		log.Print("Waiting to job success.")
+	}
+
+	for {
 		if myJob.Status.Failed == 1 {
 			panic("Job failed")
 		}
-		for myJob.Status.Succeeded != 1 {
-			if myJob.Status.Failed == 1 {
-				panic("Job failed")
-			}
-			log.Print(".")
-			time.Sleep(10 * time.Second)
+		if myJob.Status.Succeeded == 1 {
+			break
 		}
-		log.Print("Success.")
-	} else {
-		fmt.Println("Job not found")
+		log.Printf("Active: %d\n", myJob.Status.Active)
+		log.Printf("Succeeded: %d\n", myJob.Status.Succeeded)
+		log.Printf("Failed: %d\n", myJob.Status.Failed)
+		log.Print(".")
+		time.Sleep(10 * time.Second)
+		myJob = getJob(jobName, namespaceName, clientset, waitToJob)
+
+	}
+
+	if myJob.Status.Succeeded == 1 {
+		log.Println("Job success")
 	}
 }
