@@ -24,12 +24,12 @@ func main() {
 
 	clientset := kubeclient.GetClientset()
 
-	log.Print("Looking the " + *jobName + " Job in " + *namespaceName + " NS")
+	log.Printf("Looking the %s Job in %s NS\n", *jobName, *namespaceName)
 
 	found := false
 	myJob, err := clientset.BatchV1().Jobs(*namespaceName).Get(*jobName, metav1.GetOptions{})
 	if (err != nil) {
-		log.Println("Can't get the job:", err)
+		log.Printf("Can't get the job: %v\n", err)
 		if (*waitToJob == false) {
 			os.Exit(-1)		
 		}
@@ -38,11 +38,11 @@ func main() {
 	for {
 		if myJob.UID != "" && found == false {
 			found = true
-			log.Print("Found the job: " + myJob.UID)
+			log.Printf("Found the job: %s\n", myJob.UID)
 		}
 
 		if myJob.Status.Failed > 0 {
-			log.Println("Job failed")
+			log.Printf("Job failed")
 			os.Exit(-1)
 		}
 		if myJob.Status.Succeeded > 0 {
@@ -57,19 +57,19 @@ func main() {
 			if (*waitToJob == false) {
 				os.Exit(-1)		
 			} else {
-				log.Println("Can't get the job:", err)
+				log.Printf("Can't get the job: %v\n", err)
 			}
 		}
 	}
 
 	if myJob.Status.Succeeded == 1 {
-		log.Println("Job success")
+		log.Printf("Job success")
 		if *deleteJob {
 			err := clientset.BatchV1().Jobs(*namespaceName).Delete(*jobName, new(metav1.DeleteOptions))
 			if (err!=nil) {
-				log.Println("Can't delete the job:", err)
+				log.Printf("Can't delete the job: %v\n", err)
 			} else {
-				log.Println("Job deleted")
+				log.Printf("Job deleted")
 			}
 		}
 	}
