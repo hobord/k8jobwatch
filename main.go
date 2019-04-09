@@ -13,7 +13,7 @@ import (
 
 func main() {
 	jobName := flag.String("j", "", "job name")
-	namespaceName := flag.String("ns", "", "namespace")
+	namespaceName := flag.String("ns", "default", "namespace")
 	waitToJob := flag.Bool("w", false, "wait to job if (job is not exists)")
 	deleteJob := flag.Bool("d", false, "delete job when exit")
 	flag.Parse()
