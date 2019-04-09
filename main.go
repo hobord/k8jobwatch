@@ -8,29 +8,14 @@ import (
 	"time"
 
 	"github.com/hobord/k8jobwatch/kubeclient"
-	batch "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
-
-func getJob(jobName *string, namespaceName *string, clientset *kubernetes.Clientset) (job batch.Job) {
-	jobs, err := clientset.BatchV1().Jobs(*namespaceName).List(metav1.ListOptions{})
-	if err != nil {
-		panic(err.Error())
-	}
-	for _, foundJob := range jobs.Items {
-		if *jobName == foundJob.ObjectMeta.GetName() {
-			job = foundJob
-		}
-	}
-
-	return job
-}
 
 func main() {
 	jobName := flag.String("j", "", "job name")
-	namespaceName := flag.String("n", "", "namespace")
+	namespaceName := flag.String("ns", "", "namespace")
 	waitToJob := flag.Bool("w", false, "wait to job if (job is not exists)")
+	deleteJob := flag.Bool("d", false, "delete job when exit")
 	flag.Parse()
 	if *jobName == "" {
 		fmt.Println("Job name parameter is mandatory! Use -j=jobname ")
@@ -39,40 +24,48 @@ func main() {
 
 	clientset := kubeclient.GetClientset()
 
-	log.Print("Looking the job: " + *jobName + " in " + *namespaceName + " NS")
-	myJob := getJob(jobName, namespaceName, clientset)
+	log.Print("Looking the " + *jobName + " Job in " + *namespaceName + " NS")
 
-	// fmt.Println(myJob.UID)
-	// fmt.Println(myJob.Status.Active)
-	// fmt.Println(myJob.Status.Succeeded)
-	// fmt.Println(myJob.Status.Failed)
-	// fmt.Println(myJob.Status.String())
+	myJob, err := clientset.BatchV1().Jobs(*namespaceName).Get(*jobName, metav1.GetOptions{})
+	if (err != nil) {
+		log.Println("Can't get job:", err)
+		if (*waitToJob == false) {
+			os.Exit(-1)		
+		}
+	}
 
 	if myJob.UID != "" {
 		log.Print("Found: " + myJob.UID)
 	}
 
 	for {
-		if myJob.Status.Failed == 1 {
-			panic("Job failed")
+		if myJob.Status.Failed > 0 {
+			log.Println("Job failed")
+			os.Exit(-1)
 		}
-		if myJob.Status.Succeeded == 1 {
+		if myJob.Status.Succeeded > 0 {
 			break
 		}
-		if myJob.Status.Failed == 0 && myJob.Status.Succeeded == 0 && myJob.Status.Active == 0 && *waitToJob == false {
-			log.Println("Job not found")
-			break
-		}
-		log.Printf("Active: %d\n", myJob.Status.Active)
-		log.Printf("Succeeded: %d\n", myJob.Status.Succeeded)
-		log.Printf("Failed: %d\n", myJob.Status.Failed)
-		log.Print(".")
-		time.Sleep(10 * time.Second)
-		myJob = getJob(jobName, namespaceName, clientset)
 
+		log.Printf("Active: %d, Succeeded: %d, Failed: %d", myJob.Status.Active, myJob.Status.Succeeded, myJob.Status.Failed)
+		time.Sleep(10 * time.Second)
+		myJob, err = clientset.BatchV1().Jobs(*namespaceName).Get(*jobName, metav1.GetOptions{})
+		if (err != nil) {
+			if (*waitToJob == false) {
+				os.Exit(-1)		
+			}
+		}
 	}
 
 	if myJob.Status.Succeeded == 1 {
 		log.Println("Job success")
+		if *deleteJob {
+			err := clientset.BatchV1().Jobs(*namespaceName).Delete(*jobName, new(metav1.DeleteOptions))
+			if (err!=nil) {
+				log.Println("Can't delete job: %v", err)
+			} else {
+				log.Println("Job deleted")
+			}
+		}
 	}
 }
