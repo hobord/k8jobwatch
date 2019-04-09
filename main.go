@@ -26,19 +26,21 @@ func main() {
 
 	log.Print("Looking the " + *jobName + " Job in " + *namespaceName + " NS")
 
+	found := false
 	myJob, err := clientset.BatchV1().Jobs(*namespaceName).Get(*jobName, metav1.GetOptions{})
 	if (err != nil) {
-		log.Println("Can't get job:", err)
+		log.Println("Can't get the job:", err)
 		if (*waitToJob == false) {
 			os.Exit(-1)		
 		}
 	}
 
-	if myJob.UID != "" {
-		log.Print("Found: " + myJob.UID)
-	}
-
 	for {
+		if myJob.UID != "" && found == false {
+			found = true
+			log.Print("Found the job: " + myJob.UID)
+		}
+
 		if myJob.Status.Failed > 0 {
 			log.Println("Job failed")
 			os.Exit(-1)
@@ -46,13 +48,16 @@ func main() {
 		if myJob.Status.Succeeded > 0 {
 			break
 		}
-
-		log.Printf("Active: %d, Succeeded: %d, Failed: %d", myJob.Status.Active, myJob.Status.Succeeded, myJob.Status.Failed)
+		if found {
+			log.Printf("Active: %d, Succeeded: %d, Failed: %d", myJob.Status.Active, myJob.Status.Succeeded, myJob.Status.Failed)
+		} 
 		time.Sleep(10 * time.Second)
 		myJob, err = clientset.BatchV1().Jobs(*namespaceName).Get(*jobName, metav1.GetOptions{})
 		if (err != nil) {
 			if (*waitToJob == false) {
 				os.Exit(-1)		
+			} else {
+				log.Println("Can't get the job:", err)
 			}
 		}
 	}
@@ -62,7 +67,7 @@ func main() {
 		if *deleteJob {
 			err := clientset.BatchV1().Jobs(*namespaceName).Delete(*jobName, new(metav1.DeleteOptions))
 			if (err!=nil) {
-				log.Println("Can't delete job: %v", err)
+				log.Println("Can't delete the job:", err)
 			} else {
 				log.Println("Job deleted")
 			}
